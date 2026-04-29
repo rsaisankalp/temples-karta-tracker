@@ -696,21 +696,28 @@ def build_karta_progress_message(slug):
             if status == 'Done': done.append(line)
             else: togo.append('• ' + name + ' — D' + str(day) + '/' + str(stop))
     total = len(done) + len(togo)
-    name = karta_name or slug
+    raw = (karta_name or slug).strip()
+    nl_name = raw.lower()
+    if any(nl_name.startswith(p) for p in ('swami ', 'sw.', 'sw ', 'br.', 'br ', 'rishi ')):
+        salut = 'Swamiji'
+    elif ' ji' in nl_name or nl_name.endswith('ji'):
+        salut = raw
+    else:
+        salut = raw + ' ji'
     progress_line = 'Progress: ' + str(len(done)) + ' / ' + str(total) + ' temples · ' + str(pcoll) + ' / ' + str(total) + ' prasaad collected'
     todo_block = ('Yet to visit:' + chr(10) + chr(10).join(togo[:25])) if togo else ''
     done_block = ('Already completed:' + chr(10) + chr(10).join(done[:25])) if done else ''
     link = 'https://temples.vaidicpujas.in/k/' + slug
     NL = chr(10)
     templates = [
-        '🙏🏼 Pranam {name},' + NL+NL + 'Hope all is going well with the yatra. A small update on your temples:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Whenever you get a moment, kindly mark the temples as *Done* and prasaad as *Collected* on your tracker — and do share a few photos / your experience if possible 🙌🏼' + NL+NL + '🔗 {link}' + NL+NL + 'With gratitude 🕉️',
-        'Namaskaram {name} 🙏🏼' + NL+NL + 'A gentle followup on the temple yatra. Here is where things stand:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Request you to please mark each temple as *Done* and the prasaad as *Collected* on the tracker as you complete them — also a few words or photos of the experience would be wonderful to share 📸🌸' + NL+NL + '🔗 {link}' + NL+NL + 'Many thanks 🕉️',
-        'Pranam {name} ji 🌺' + NL+NL + 'Hope your yatra is going divinely. Sending across the latest status:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Whenever convenient, do mark *Done* / *Collected* on your tracker — and please share any pictures or experiences that come along the way, would love to read them 🙏🏼' + NL+NL + '🔗 {link}',
-        'Hari Om {name} 🌸' + NL+NL + 'Quick update on your assigned temples:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Kindly tap *Done* and *Collected* on the tracker for the temples you have visited — and a short note or photo of the experience would mean a lot 📷🪷' + NL+NL + '🔗 {link}' + NL+NL + 'Gratefully yours 🕉️',
-        'Namaste {name} 🙏🏼' + NL+NL + 'Hope this finds you in good health. Here is a snapshot of the yatra:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'At your convenience, please update the temples you have completed and prasaad collected on the tracker, and share whatever photos or thoughts you can — even a single line is a blessing to read 🌼' + NL+NL + '🔗 {link}' + NL+NL + 'With deep regards 🕉️',
+        'Jai Gurudev {salut} 🙏🏼' + NL+NL + 'Sharing your yatra update:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Kindly mark each temple as *Done* and prasaad as *Collected* on the tracker. Do share photos and a few words from the experience 📸' + NL+NL + '🔗 {link}' + NL+NL + 'With gratitude 🙏🏼',
+        'Jai Gurudev {salut}' + NL+NL + 'A small update from the yatra:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Please update the tracker as you complete each temple — and share a few photos when convenient 🌸' + NL+NL + '🔗 {link}' + NL+NL + 'With gratitude 🙏🏼',
+        'Jai Gurudev {salut} 🙏🏼' + NL+NL + 'Yatra status:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Request you to mark *Done* and *Collected* on the tracker — and share photos from the temples whenever possible.' + NL+NL + '🔗 {link}' + NL+NL + 'With gratitude 🙏🏼',
+        'Jai Gurudev {salut} 🙏🏼' + NL+NL + 'Here is where the yatra stands:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Kindly tap *Done* / *Collected* for each temple visited, and please share photos of the experiences too 🌼' + NL+NL + '🔗 {link}' + NL+NL + 'With gratitude 🙏🏼',
+        'Jai Gurudev {salut}' + NL+NL + 'Quick yatra update:' + NL+NL + '📊 {progress}' + NL+NL + '{todo_block}' + NL+NL + '{done_block}' + NL+NL + 'Please mark on the tracker as you complete temples, and share a few pictures when you can 📷' + NL+NL + '🔗 {link}' + NL+NL + 'With gratitude 🙏🏼',
     ]
     tmpl = random.choice(templates)
-    msg = tmpl.format(name=name, progress=progress_line, todo_block=todo_block, done_block=done_block, link=link)
+    msg = tmpl.format(salut=salut, progress=progress_line, todo_block=todo_block, done_block=done_block, link=link)
     while NL*4 in msg:
         msg = msg.replace(NL*4, NL*2)
     return karta_name, msg

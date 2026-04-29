@@ -696,14 +696,19 @@ def build_karta_progress_message(slug):
             if status == 'Done': done.append(line)
             else: togo.append('• ' + name + ' — D' + str(day) + '/' + str(stop))
     total = len(done) + len(togo)
-    msg = '🕉️ Temple Yatra — ' + (karta_name or slug) + '\n'
-    msg += 'Progress: ' + str(len(done)) + '/' + str(total) + ' temples done\n'
-    msg += 'Prasaad: ' + str(pcoll) + '/' + str(total) + ' collected\n\n'
-    if done:
-        msg += '✅ Done:\n' + '\n'.join(done[:30]) + '\n\n'
+    name_for_greeting = karta_name or slug
+    msg = '🙏🏼 Pranam ' + name_for_greeting + ',\n\n'
+    msg += 'Hope you are doing well. Sharing your Temple Yatra status:\n\n'
+    msg += '📊 Progress: ' + str(len(done)) + ' / ' + str(total) + ' temples · '
+    msg += str(pcoll) + ' / ' + str(total) + ' prasaad collected\n\n'
     if togo:
-        msg += '⏳ Pending:\n' + '\n'.join(togo[:30]) + '\n\n'
-    msg += '🔗 https://temples.vaidicpujas.in/k/' + slug
+        msg += '⏳ Yet to visit:\n' + '\n'.join(togo[:30]) + '\n\n'
+    if done:
+        msg += '✅ Already completed:\n' + '\n'.join(done[:30]) + '\n\n'
+    msg += 'Kindly mark each temple as *Done* and prasaad as *Collected* on your tracker as you complete them. '
+    msg += 'Please also share your experience and photos when possible 🙌🏼\n\n'
+    msg += '🔗 Your tracker:\nhttps://temples.vaidicpujas.in/k/' + slug + '\n\n'
+    msg += 'With gratitude,\nVDS Team 🕉️'
     return karta_name, msg
 
 @app.route('/followup/api/wa-send', methods=['POST'])

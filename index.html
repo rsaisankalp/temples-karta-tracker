@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Temple Pilgrimage Route</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+
+  /* NAVBAR */
+  #navbar {
+    position: sticky; top: 0; z-index: 1000;
+    background: linear-gradient(135deg, #8B4513 0%, #D2691E 50%, #FF8C00 100%);
+    color: white; padding: 10px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+  }
+  #navbar h1 { font-size: 1rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+  #navbar h1 span { font-size: 1.3rem; }
+  .state-tabs {
+    display: flex; gap: 6px; overflow-x: auto; flex-grow: 1;
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  .state-tabs::-webkit-scrollbar { display: none; }
+  .state-tab {
+    padding: 7px 14px; border-radius: 20px; border: 2px solid rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.15); color: white; cursor: pointer;
+    font-size: 0.85rem; font-weight: 600; white-space: nowrap;
+    transition: all 0.2s; min-height: 36px; flex-shrink: 0;
+  }
+  .state-tab:hover { background: rgba(255,255,255,0.3); }
+  .state-tab.active {
+    background: white; color: #8B4513; border-color: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  /* MAIN LAYOUT */
+  #main { display: flex; flex-direction: column; height: calc(100vh - 56px); }
+
+  /* MAP */
+  #map-wrap {
+    position: relative; flex-shrink: 0;
+    height: 45vh; min-height: 250px;
+  }
+  #map { width: 100%; height: 100%; }
+
+  /* SUMMARY BAR */
+  #summary-bar {
+    background: #fff; border-top: 3px solid #FF8C00; border-bottom: 1px solid #e0e0e0;
+    padding: 8px 14px; font-size: 0.82rem; color: #555;
+    white-space: nowrap; overflow-x: auto;
+  }
+  #summary-bar strong { color: #333; }
+
+  /* TABLE SECTION */
+  #table-section {
+    flex: 1; overflow: hidden; display: flex; flex-direction: column;
+    background: white;
+  }
+
+  /* DAY FILTER PILLS */
+  #day-filter {
+    padding: 8px 12px; border-bottom: 1px solid #e8e8e8;
+    display: flex; gap: 6px; overflow-x: auto; flex-shrink: 0;
+    scrollbar-width: thin; background: #fafafa;
+  }
+  #day-filter::-webkit-scrollbar { height: 3px; }
+  .day-pill {
+    padding: 5px 12px; border-radius: 14px; border: none; cursor: pointer;
+    font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+    transition: all 0.15s; min-height: 30px; flex-shrink: 0;
+    opacity: 0.7;
+  }
+  .day-pill:hover { opacity: 1; transform: scale(1.05); }
+  .day-pill.active { opacity: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+
+  /* ITINERARY TABLE */
+  #table-wrap {
+    flex: 1; overflow-y: auto; overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table { width: 100%; border-collapse: collapse; min-width: 520px; }
+  thead th {
+    position: sticky; top: 0; background: #2c2c2c; color: white;
+    padding: 8px 10px; font-size: 0.75rem; text-align: left;
+    white-space: nowrap; z-index: 2;
+  }
+  .day-header {
+    background: #f0f0f0; font-weight: 700; font-size: 0.8rem;
+    text-align: left;
+  }
+  .day-header td {
+    padding: 7px 12px; border-left: 4px solid #ccc;
+    white-space: nowrap;
+  }
+  .temple-row {
+    border-bottom: 1px solid #e8e8e8; cursor: pointer;
+    transition: background 0.15s; min-height: 60px;
+  }
+  .temple-row:hover { filter: brightness(0.94); }
+  .temple-row.highlighted {
+    outline: 2px solid #FFD700; outline-offset: -2px;
+    background: #FFFDE7 !important;
+  }
+  .temple-row td { padding: 8px 10px; vertical-align: middle; font-size: 0.82rem; }
+  .stop-num { font-weight: 700; color: #888; font-size: 0.75rem; text-align: center; }
+  .type-icon { text-align: center; font-size: 1.1rem; }
+  .temple-name { font-weight: 600; color: #1a1a1a; line-height: 1.3; }
+  .temple-district { color: #888; font-size: 0.72rem; margin-top: 2px; }
+  .km-cell, .time-cell { text-align: center; white-space: nowrap; color: #555; }
+  .window-cell { white-space: nowrap; font-size: 0.78rem; color: #444; text-align: center; }
+  .gps-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 6px 10px; background: #4285F4; color: white;
+    border-radius: 6px; text-decoration: none; font-size: 0.75rem;
+    font-weight: 600; white-space: nowrap; min-height: 36px;
+    transition: background 0.15s; border: none; cursor: pointer;
+  }
+  .gps-btn:hover { background: #1a73e8; }
+  .shiva-row { background: #FFF3E0; }
+  .vishnu-row { background: #E3F2FD; }
+
+  /* POPUP STYLES */
+  .popup-content { min-width: 200px; }
+  .popup-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+  .popup-sub { font-size: 0.78rem; color: #666; margin-bottom: 8px; }
+  .popup-time { font-size: 0.8rem; margin-bottom: 8px; color: #444; }
+  .popup-btns { display: flex; flex-direction: column; gap: 6px; }
+  .popup-btn {
+    display: block; text-align: center; padding: 8px 12px;
+    border-radius: 8px; font-weight: 600; font-size: 0.82rem;
+    text-decoration: none; transition: opacity 0.15s;
+  }
+  .popup-btn:hover { opacity: 0.85; }
+  .popup-btn-maps { background: #4285F4; color: white; }
+  .popup-btn-dir { background: #34A853; color: white; }
+
+  /* DESKTOP LAYOUT */
+  @media (min-width: 769px) {
+    #main { flex-direction: column; }
+    #map-wrap { height: 50vh; }
+    #content-row {
+      flex: 1; display: flex; overflow: hidden;
+    }
+    #map-wrap { flex: 0 0 55%; height: auto; }
+    #table-section { flex: 0 0 45%; }
+    #main { flex-direction: row; flex-wrap: wrap; }
+    #map-wrap { order: 1; width: 55%; height: calc(100vh - 56px); }
+    #right-panel { order: 2; width: 45%; height: calc(100vh - 56px); display: flex; flex-direction: column; overflow: hidden; }
+    #summary-bar { order: 0; width: 100%; }
+  }
+
+  /* LOADING */
+  #loading {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    background: rgba(255,255,255,0.9); padding: 20px 30px; border-radius: 12px;
+    font-weight: 600; font-size: 0.9rem; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    z-index: 999;
+  }
+
+  /* SCROLL TO TOP */
+  #scroll-top {
+    position: fixed; bottom: 20px; right: 20px; z-index: 500;
+    background: #FF8C00; color: white; border: none; border-radius: 50%;
+    width: 44px; height: 44px; font-size: 1.2rem; cursor: pointer;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25); display: none;
+    align-items: center; justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="navbar">
+  <h1><span>🛕</span> Temple Pilgrimage</h1>
+  <div class="state-tabs" id="state-tabs">
+    <button class="state-tab active" data-state="Tamil Nadu">🏛 Tamil Nadu</button>
+    <button class="state-tab" data-state="Karnataka">🌿 Karnataka</button>
+    <button class="state-tab" data-state="Andhra Pradesh">⛰ Andhra Pradesh</button>
+    <button class="state-tab" data-state="Telangana">🌸 Telangana</button>
+  </div>
+</div>
+<div id="karta-bar" style="padding:10px 16px;background:#fff;border-bottom:1px solid #eee;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;">
+    <label style="font-weight:600;color:#555;">👤 Karta:</label>
+    <select id="karta-select" style="padding:6px 10px;border:1px solid #ddd;border-radius:5px;background:#fff;font-size:13px;cursor:pointer;flex:1;max-width:320px;">
+      <option value="">— All temples (no filter) —</option>
+    </select>
+    <a id="karta-link" href="#" target="_blank" style="display:none;color:#b8860b;text-decoration:none;font-weight:600;font-size:13px;background:#fff5e1;padding:5px 10px;border-radius:5px;">📋 Open tracking →</a>
+  </div>
+
+
+<div id="summary-bar">Loading...</div>
+
+<div id="main">
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="loading">🗺️ Loading map...</div>
+  </div>
+  <div id="right-panel">
+    <div id="table-section">
+      <div id="day-filter"></div>
+      <div id="table-wrap">
+        <table id="itinerary-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>T</th>
+              <th>Temple</th>
+              <th>KM</th>
+              <th>Drive</th>
+              <th>Window</th>
+              <th>GPS</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button id="scroll-top" onclick="document.getElementById('table-wrap').scrollTop=0" title="Back to top">↑</button>
+
+<script>
+const SCHEDULES = {"Tamil Nadu": [{"day": 1, "stop": 1, "type": "Shiva", "name": "Arunachaleswarar Temple", "district": "Thiruvannamalai", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 12.2319, "lon": 79.0668, "id": "S1", "contact_person": "Arunagiri Sivam", "contact_phone": "73373 39382"}, {"day": 1, "stop": 2, "type": "Vishnu", "name": "Yoga Narasimha Temple, Sholinghur", "district": "Ranipet", "state": "Tamil Nadu", "km_from_prev": 137.3, "travel_min": 206, "archana_min": 90, "arrive": "09:56", "depart": "11:26", "lat": 13.0888, "lon": 79.4182, "id": "V34"}, {"day": 1, "stop": 3, "type": "Shiva", "name": "Kailasanathar Temple (Kanchipuram)", "district": "Kanchipuram", "state": "Tamil Nadu", "km_from_prev": 56.5, "travel_min": 85, "archana_min": 90, "arrive": "12:51", "depart": "14:21", "lat": 12.8084, "lon": 79.6898, "id": "S11"}, {"day": 1, "stop": 4, "type": "Vishnu", "name": "Vaikunta Perumal Temple, Kanchipuram", "district": "Kanchipuram", "state": "Tamil Nadu", "km_from_prev": 2.0, "travel_min": 3, "archana_min": 90, "arrive": "14:24", "depart": "15:54", "lat": 12.8372, "lon": 79.7003, "id": "V40"}, {"day": 1, "stop": 5, "type": "Vishnu", "name": "Varadharaja Perumal Temple, Kanchipuram", "district": "Kanchipuram", "state": "Tamil Nadu", "km_from_prev": 1.0, "travel_min": 1, "archana_min": 90, "arrive": "15:55", "depart": "17:25", "lat": 12.8197, "lon": 79.7256, "id": "V22"}, {"day": 1, "stop": 6, "type": "Shiva", "name": "Ekambareswarar Temple", "district": "Kanchipuram", "state": "Tamil Nadu", "km_from_prev": 1.8, "travel_min": 3, "archana_min": 90, "arrive": "17:28", "depart": "18:58", "lat": 12.8473, "lon": 79.6998, "id": "S3", "contact_person": "Kameshwara Gurukkal", "contact_phone": "99942 93391"}, {"day": 2, "stop": 7, "type": "Vishnu", "name": "Adikesava Perumal Temple, Sriperumbudur", "district": "Kanchipuram", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 12.9756, "lon": 79.9476, "id": "V32"}, {"day": 2, "stop": 8, "type": "Vishnu", "name": "Thiruvallur Veeraraghava Perumal Temple", "district": "Tiruvallur", "state": "Tamil Nadu", "km_from_prev": 24.6, "travel_min": 37, "archana_min": 90, "arrive": "07:07", "depart": "08:37", "lat": 13.143, "lon": 79.9054, "id": "V39"}, {"day": 2, "stop": 9, "type": "Vishnu", "name": "Parthasarathy Temple, Triplicane", "district": "Chennai", "state": "Tamil Nadu", "km_from_prev": 53.7, "travel_min": 81, "archana_min": 90, "arrive": "09:58", "depart": "11:28", "lat": 13.0539, "lon": 80.2764, "id": "V25"}, {"day": 2, "stop": 10, "type": "Shiva", "name": "Kapaleeshwarar Temple", "district": "Chennai", "state": "Tamil Nadu", "km_from_prev": 3.6, "travel_min": 5, "archana_min": 150, "arrive": "11:33", "depart": "14:03", "lat": 13.0334, "lon": 80.2687, "id": "S7", "contact_person": "Selva Ganapathy Sivam", "contact_phone": "93457 68391"}, {"day": 2, "stop": 11, "type": "Shiva", "name": "Arulmigu Marundeeswarar Temple", "district": "Chennai", "state": "Tamil Nadu", "km_from_prev": 7.5, "travel_min": 11, "archana_min": 90, "arrive": "14:14", "depart": "15:44", "lat": 12.9851, "lon": 80.2595, "id": "S23"}, {"day": 2, "stop": 12, "type": "Shiva", "name": "Shore Temple (Mamallapuram)", "district": "Chengalpattu", "state": "Tamil Nadu", "km_from_prev": 53.6, "travel_min": 80, "archana_min": 90, "arrive": "17:04", "depart": "18:34", "lat": 12.6165, "lon": 80.1992, "id": "S10"}, {"day": 3, "stop": 13, "type": "Vishnu", "name": "Thiruvidandai Nithyakalyana Perumal Temple", "district": "Chengalpattu", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 12.59, "lon": 80.19, "id": "V36"}, {"day": 3, "stop": 14, "type": "Vishnu", "name": "Govindaraja Perumal Temple, Chidambaram", "district": "Cuddalore", "state": "Tamil Nadu", "km_from_prev": 186.1, "travel_min": 279, "archana_min": 90, "arrive": "11:09", "depart": "12:39", "lat": 11.3995, "lon": 79.6891, "id": "V31"}, {"day": 3, "stop": 15, "type": "Shiva", "name": "Nataraja Temple (Chidambaram)", "district": "Cuddalore", "state": "Tamil Nadu", "km_from_prev": 0.6, "travel_min": 1, "archana_min": 150, "arrive": "12:40", "depart": "15:10", "lat": 11.3993, "lon": 79.6937, "id": "S2"}, {"day": 3, "stop": 16, "type": "Shiva", "name": "Brahmapureeswarar Temple (Sirkali)", "district": "Nagapattinam", "state": "Tamil Nadu", "km_from_prev": 26.0, "travel_min": 39, "archana_min": 90, "arrive": "15:49", "depart": "17:19", "lat": 11.0778, "lon": 79.8184, "id": "S18", "contact_person": "Kailash Sivam", "contact_phone": "99442 12232"}, {"day": 3, "stop": 17, "type": "Shiva", "name": "Vaitheeswaran Koil", "district": "Nagapattinam", "state": "Tamil Nadu", "km_from_prev": 2.5, "travel_min": 4, "archana_min": 90, "arrive": "17:23", "depart": "18:53", "lat": 11.2063, "lon": 79.7574, "id": "S19"}, {"day": 4, "stop": 18, "type": "Shiva", "name": "Amirthakadeswarar Temple (Thirukadaiyur)", "district": "Nagapattinam", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 11.1169, "lon": 79.74, "id": "S17", "contact_person": "Muthu Kumar Sivam", "contact_phone": "86100 04924"}, {"day": 4, "stop": 19, "type": "Vishnu", "name": "Thirukkannapuram Sowriraja Perumal Temple", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 1.7, "travel_min": 3, "archana_min": 90, "arrive": "06:33", "depart": "08:03", "lat": 10.8675, "lon": 79.7045, "id": "V44"}, {"day": 4, "stop": 20, "type": "Shiva", "name": "Dharbaranyeswarar Temple (Navagraha - Saturn)", "district": "Karaikal", "state": "Tamil Nadu", "km_from_prev": 29.5, "travel_min": 44, "archana_min": 90, "arrive": "08:47", "depart": "10:17", "lat": 10.9269, "lon": 79.8214, "id": "S21", "contact_person": "Maha Raja Sivam", "contact_phone": "86674 27565"}, {"day": 4, "stop": 21, "type": "Shiva", "name": "Arulmigu Thiyagarajar Temple (Tiruvarur)", "district": "Tiruvarur", "state": "Tamil Nadu", "km_from_prev": 36.6, "travel_min": 55, "archana_min": 90, "arrive": "11:12", "depart": "12:42", "lat": 10.772, "lon": 79.633, "id": "S12", "contact_person": "Sundaramurthy Gurukkal", "contact_phone": "94434 75588"}, {"day": 4, "stop": 22, "type": "Vishnu", "name": "Rajagopalaswamy Temple, Mannargudi", "district": "Tiruvarur", "state": "Tamil Nadu", "km_from_prev": 30.3, "travel_min": 45, "archana_min": 90, "arrive": "13:27", "depart": "14:57", "lat": 10.667, "lon": 79.4422, "id": "V27"}, {"day": 4, "stop": 23, "type": "Shiva", "name": "Suryanar Koil (Navagraha - Sun)", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 37.6, "travel_min": 56, "archana_min": 90, "arrive": "15:53", "depart": "17:23", "lat": 10.92, "lon": 79.48, "id": "S20"}, {"day": 5, "stop": 24, "type": "Shiva", "name": "Mahalinga Swamy Temple (Thiruvidaimarudur)", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 10.9583, "lon": 79.5076, "id": "S16"}, {"day": 5, "stop": 25, "type": "Shiva", "name": "Naganathaswamy Temple (Navagraha - Rahu)", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 1.1, "travel_min": 2, "archana_min": 90, "arrive": "06:32", "depart": "08:02", "lat": 10.96, "lon": 79.5, "id": "S22", "contact_person": "Senthil Gurukkal", "contact_phone": "87789 29295"}, {"day": 5, "stop": 26, "type": "Shiva", "name": "Gangaikonda Cholapuram Temple", "district": "Ariyalur", "state": "Tamil Nadu", "km_from_prev": 36.3, "travel_min": 54, "archana_min": 90, "arrive": "08:56", "depart": "10:26", "lat": 11.2062, "lon": 79.4486, "id": "S8", "contact_person": "Bruhadeeshwara Sivam", "contact_phone": "87609 53862"}, {"day": 5, "stop": 27, "type": "Vishnu", "name": "Bhu Varahaswamy Temple, Srimushnam", "district": "Cuddalore", "state": "Tamil Nadu", "km_from_prev": 32.4, "travel_min": 49, "archana_min": 90, "arrive": "11:15", "depart": "12:45", "lat": 11.4183, "lon": 79.3778, "id": "V30"}, {"day": 5, "stop": 28, "type": "Vishnu", "name": "Oppiliappan Temple (Thiruvinnagar)", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 61.7, "travel_min": 93, "archana_min": 90, "arrive": "14:18", "depart": "15:48", "lat": 10.998, "lon": 79.4528, "id": "V24"}, {"day": 5, "stop": 29, "type": "Vishnu", "name": "Kabisthalam Gajendravarathar Temple", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 6.4, "travel_min": 10, "archana_min": 90, "arrive": "15:58", "depart": "17:28", "lat": 10.96, "lon": 79.43, "id": "V69"}, {"day": 6, "stop": 30, "type": "Vishnu", "name": "Hara Saba Vimoshana Perumal Temple, Thirukandiyur", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 10.97, "lon": 79.41, "id": "V70"}, {"day": 6, "stop": 31, "type": "Vishnu", "name": "Sarangapani Temple, Kumbakonam", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 3.3, "travel_min": 5, "archana_min": 90, "arrive": "06:35", "depart": "08:05", "lat": 10.9593, "lon": 79.3748, "id": "V23"}, {"day": 6, "stop": 32, "type": "Shiva", "name": "Athi Kumbeswarar Temple", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 0.5, "travel_min": 1, "archana_min": 90, "arrive": "08:06", "depart": "09:36", "lat": 10.9617, "lon": 79.3845, "id": "S70", "contact_person": "Gurukrishna Sivam", "contact_phone": "99865 56229"}, {"day": 6, "stop": 33, "type": "Vishnu", "name": "Nachiarkoil Srinivasa Perumal Temple", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 4.7, "travel_min": 7, "archana_min": 90, "arrive": "09:43", "depart": "11:13", "lat": 10.947, "lon": 79.432, "id": "V42", "contact_person": "Vasudeva Bhattacharyar", "contact_phone": "94861 56376"}, {"day": 6, "stop": 34, "type": "Shiva", "name": "Airavatesvara Temple (Darasuram)", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 1.5, "travel_min": 2, "archana_min": 90, "arrive": "11:15", "depart": "12:45", "lat": 10.949, "lon": 79.3554, "id": "S9", "contact_person": "Gurukrishna Sivam", "contact_phone": "99865 56229"}, {"day": 6, "stop": 35, "type": "Shiva", "name": "108 Shivalayam, Papanasam", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 12.3, "travel_min": 18, "archana_min": 90, "arrive": "13:03", "depart": "14:33", "lat": 10.8604, "lon": 79.2358, "id": "S69", "contact_person": "Sankara Gurukkal", "contact_phone": "99523 21805"}, {"day": 6, "stop": 36, "type": "Vishnu", "name": "Sri Srinivasa Perumal Temple, Papanasam", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "14:33", "depart": "16:03", "lat": 10.8604, "lon": 79.2358, "id": "V68"}, {"day": 7, "stop": 37, "type": "Shiva", "name": "Brihadeeswara Temple (Big Temple)", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 150, "arrive": "05:00", "depart": "07:30", "lat": 10.7826, "lon": 79.1314, "id": "S6", "contact_person": "Gowtham Sivam", "contact_phone": "88254 88446"}, {"day": 7, "stop": 38, "type": "Shiva", "name": "Ayyarappar Temple (Thiruvayaru)", "district": "Thanjavur", "state": "Tamil Nadu", "km_from_prev": 15.8, "travel_min": 24, "archana_min": 90, "arrive": "07:54", "depart": "09:24", "lat": 10.8892, "lon": 79.1067, "id": "S68", "contact_person": "Vignesh Sivam", "contact_phone": "90037 32016"}, {"day": 7, "stop": 39, "type": "Vishnu", "name": "Thiruvellarai Pundarikakshan Temple", "district": "Tiruchirappalli", "state": "Tamil Nadu", "km_from_prev": 55.1, "travel_min": 83, "archana_min": 90, "arrive": "10:47", "depart": "12:17", "lat": 10.9566, "lon": 78.6685, "id": "V45"}, {"day": 7, "stop": 40, "type": "Vishnu", "name": "Sri Ranganathaswamy Temple, Srirangam", "district": "Tiruchirappalli", "state": "Tamil Nadu", "km_from_prev": 18.2, "travel_min": 27, "archana_min": 150, "arrive": "12:44", "depart": "15:14", "lat": 10.8627, "lon": 78.6899, "id": "V21"}, {"day": 7, "stop": 41, "type": "Shiva", "name": "Jambukeswarar Temple (Thiruvanaikaval)", "district": "Tiruchirappalli", "state": "Tamil Nadu", "km_from_prev": 1.8, "travel_min": 3, "archana_min": 90, "arrive": "15:17", "depart": "16:47", "lat": 10.8527, "lon": 78.705, "id": "S4", "contact_person": "Ayyappa Sivam", "contact_phone": "90038 18063"}, {"day": 8, "stop": 42, "type": "Vishnu", "name": "Thirukoshtiyur Sowmya Narayana Perumal Temple", "district": "Sivaganga", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 10.0601, "lon": 78.5598, "id": "V43"}, {"day": 8, "stop": 43, "type": "Vishnu", "name": "Azhagar Kovil (Kallazhagar Temple)", "district": "Madurai", "state": "Tamil Nadu", "km_from_prev": 34.9, "travel_min": 52, "archana_min": 90, "arrive": "07:22", "depart": "08:52", "lat": 10.0748, "lon": 78.2134, "id": "V29"}, {"day": 8, "stop": 44, "type": "Shiva", "name": "Meenakshi Sundareswarar Temple", "district": "Madurai", "state": "Tamil Nadu", "km_from_prev": 21.3, "travel_min": 32, "archana_min": 150, "arrive": "09:24", "depart": "11:54", "lat": 9.9195, "lon": 78.1194, "id": "S5", "contact_person": "Halashyanatha Bhattar", "contact_phone": "94867 33554"}, {"day": 8, "stop": 45, "type": "Vishnu", "name": "Koodal Azhagar Temple, Madurai", "district": "Madurai", "state": "Tamil Nadu", "km_from_prev": 0.9, "travel_min": 1, "archana_min": 90, "arrive": "11:55", "depart": "13:25", "lat": 9.9136, "lon": 78.1199, "id": "V28"}, {"day": 8, "stop": 46, "type": "Vishnu", "name": "Srivilliputhur Andal Temple", "district": "Virudhunagar", "state": "Tamil Nadu", "km_from_prev": 90.9, "travel_min": 136, "archana_min": 90, "arrive": "15:41", "depart": "17:11", "lat": 9.5083, "lon": 77.6304, "id": "V26"}, {"day": 9, "stop": 47, "type": "Shiva", "name": "Kasi Viswanathar Temple (Tenkasi)", "district": "Tenkasi", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 8.9567, "lon": 77.3077, "id": "S14"}, {"day": 9, "stop": 48, "type": "Shiva", "name": "Kutralanathar Temple (Courtallam)", "district": "Tenkasi", "state": "Tamil Nadu", "km_from_prev": 7.3, "travel_min": 11, "archana_min": 90, "arrive": "06:41", "depart": "08:11", "lat": 8.9296, "lon": 77.2748, "id": "S15"}, {"day": 9, "stop": 49, "type": "Vishnu", "name": "Thiruvattaru Adikesava Perumal Temple", "district": "Kanyakumari", "state": "Tamil Nadu", "km_from_prev": 90.3, "travel_min": 135, "archana_min": 90, "arrive": "10:26", "depart": "11:56", "lat": 8.3128, "lon": 77.3741, "id": "V41"}, {"day": 9, "stop": 50, "type": "Shiva", "name": "Suchindram Thanumalayan Temple", "district": "Kanyakumari", "state": "Tamil Nadu", "km_from_prev": 26.0, "travel_min": 39, "archana_min": 90, "arrive": "12:35", "depart": "14:05", "lat": 8.1548, "lon": 77.4653, "id": "S24"}, {"day": 9, "stop": 51, "type": "Vishnu", "name": "Thirukkurungudi Nambi Temple", "district": "Tirunelveli", "state": "Tamil Nadu", "km_from_prev": 49.3, "travel_min": 74, "archana_min": 90, "arrive": "15:19", "depart": "16:49", "lat": 8.4352, "lon": 77.5623, "id": "V33"}, {"day": 10, "stop": 52, "type": "Shiva", "name": "Nellaiappar Temple", "district": "Tirunelveli", "state": "Tamil Nadu", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 8.7285, "lon": 77.689, "id": "S13", "contact_person": "Bharath Bhattar", "contact_phone": "87549 37633"}, {"day": 10, "stop": 53, "type": "Vishnu", "name": "Alwar Thirunagari Adhinathar Temple", "district": "Thoothukudi", "state": "Tamil Nadu", "km_from_prev": 39.8, "travel_min": 60, "archana_min": 90, "arrive": "07:30", "depart": "09:00", "lat": 8.6467, "lon": 77.9633, "id": "V37"}, {"day": 10, "stop": 54, "type": "Vishnu", "name": "Sri Vaikuntanatha Perumal Temple, Srivaikuntam", "district": "Thoothukudi", "state": "Tamil Nadu", "km_from_prev": 5.8, "travel_min": 9, "archana_min": 90, "arrive": "09:09", "depart": "10:39", "lat": 8.63, "lon": 78.0, "id": "V38"}, {"day": 10, "stop": 55, "type": "Vishnu", "name": "Thiruppullani Darbhasayana Perumal Temple", "district": "Ramanathapuram", "state": "Tamil Nadu", "km_from_prev": 158.5, "travel_min": 238, "archana_min": 90, "arrive": "14:37", "depart": "16:07", "lat": 9.361, "lon": 78.8271, "id": "V35"}, {"day": 10, "stop": 56, "type": "Shiva", "name": "Ramanathaswamy Temple (Devipattinam)", "district": "Ramanathapuram", "state": "Tamil Nadu", "km_from_prev": 42.8, "travel_min": 64, "archana_min": 90, "arrive": "17:11", "depart": "18:41", "lat": 9.4792, "lon": 79.1026, "id": "S25", "contact_person": "Cha Cha Sastrigal", "contact_phone": "94433 90412"}], "Karnataka": [{"day": 1, "stop": 1, "type": "Shiva", "name": "Virupaksha Temple (Hampi)", "district": "Vijayanagara", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 150, "arrive": "05:00", "depart": "07:30", "lat": 15.3352, "lon": 76.4587, "id": "S26"}, {"day": 1, "stop": 2, "type": "Vishnu", "name": "Vittala Temple, Hampi", "district": "Vijayanagara", "state": "Karnataka", "km_from_prev": 0.2, "travel_min": 0, "archana_min": 150, "arrive": "07:30", "depart": "10:00", "lat": 15.3423, "lon": 76.4755, "id": "V5"}, {"day": 1, "stop": 3, "type": "Shiva", "name": "Pattadakal Virupaksha Temple", "district": "Bagalkot", "state": "Karnataka", "km_from_prev": 126.0, "travel_min": 189, "archana_min": 90, "arrive": "13:09", "depart": "14:39", "lat": 15.9488, "lon": 75.8179, "id": "S39"}, {"day": 1, "stop": 4, "type": "Shiva", "name": "Mahakuteshwara Temple (Mahakuta)", "district": "Bagalkot", "state": "Karnataka", "km_from_prev": 5.7, "travel_min": 9, "archana_min": 90, "arrive": "14:48", "depart": "16:18", "lat": 15.9333, "lon": 75.78, "id": "S41"}, {"day": 1, "stop": 5, "type": "Shiva", "name": "Kudala Sangama Sangameshwara Temple", "district": "Bagalkot", "state": "Karnataka", "km_from_prev": 39.9, "travel_min": 60, "archana_min": 90, "arrive": "17:18", "depart": "18:48", "lat": 16.2034, "lon": 76.0604, "id": "S32"}, {"day": 2, "stop": 6, "type": "Shiva", "name": "Badami Cave Temple 1 (Shiva)", "district": "Bagalkot", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 15.9186, "lon": 75.6742, "id": "S40"}, {"day": 2, "stop": 7, "type": "Shiva", "name": "Trikuteshwara Temple (Gadag)", "district": "Gadag", "state": "Karnataka", "km_from_prev": 71.3, "travel_min": 107, "archana_min": 90, "arrive": "08:17", "depart": "09:47", "lat": 15.4245, "lon": 75.6268, "id": "S45"}, {"day": 2, "stop": 8, "type": "Vishnu", "name": "Sri Veeranarayana Temple, Gadag", "district": "Gadag", "state": "Karnataka", "km_from_prev": 0.3, "travel_min": 1, "archana_min": 90, "arrive": "09:48", "depart": "11:18", "lat": 15.4316, "lon": 75.6271, "id": "V11"}, {"day": 2, "stop": 9, "type": "Shiva", "name": "Mahabaleshwar Temple (Gokarna)", "district": "Uttara Kannada", "state": "Karnataka", "km_from_prev": 221.6, "travel_min": 332, "archana_min": 90, "arrive": "16:50", "depart": "18:20", "lat": 14.5479, "lon": 74.3188, "id": "S27"}, {"day": 3, "stop": 10, "type": "Shiva", "name": "Murudeshwara Temple", "district": "Uttara Kannada", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 14.0946, "lon": 74.4924, "id": "S28"}, {"day": 3, "stop": 11, "type": "Shiva", "name": "Ikkeri Aghoreshwara Temple", "district": "Shivamogga", "state": "Karnataka", "km_from_prev": 107.9, "travel_min": 162, "archana_min": 90, "arrive": "09:12", "depart": "10:42", "lat": 14.1484, "lon": 75.26, "id": "S44"}, {"day": 3, "stop": 12, "type": "Shiva", "name": "Balligavi Kedareshwara Temple", "district": "Shivamogga", "state": "Karnataka", "km_from_prev": 21.7, "travel_min": 33, "archana_min": 90, "arrive": "11:15", "depart": "12:45", "lat": 14.01, "lon": 75.32, "id": "S48"}, {"day": 3, "stop": 13, "type": "Vishnu", "name": "Sri Lakshmi Narasimha Temple, Saligrama", "district": "Udupi", "state": "Karnataka", "km_from_prev": 105.8, "travel_min": 159, "archana_min": 90, "arrive": "15:24", "depart": "16:54", "lat": 13.4948, "lon": 74.7214, "id": "V20"}, {"day": 3, "stop": 14, "type": "Vishnu", "name": "Sri Krishna Matha, Udupi", "district": "Udupi", "state": "Karnataka", "km_from_prev": 21.3, "travel_min": 32, "archana_min": 90, "arrive": "17:26", "depart": "18:56", "lat": 13.3421, "lon": 74.7474, "id": "V1"}, {"day": 4, "stop": 15, "type": "Shiva", "name": "Anantheshwara Temple (Udupi)", "district": "Udupi", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 13.3408, "lon": 74.7519, "id": "S46"}, {"day": 4, "stop": 16, "type": "Vishnu", "name": "Sri Ananthapadmanabha Temple, Kudupu", "district": "Dakshina Kannada", "state": "Karnataka", "km_from_prev": 62.6, "travel_min": 94, "archana_min": 90, "arrive": "08:04", "depart": "09:34", "lat": 12.9039, "lon": 74.8938, "id": "V19"}, {"day": 4, "stop": 17, "type": "Vishnu", "name": "Sri Prasanna Venkataramana Temple, Mangalore", "district": "Dakshina Kannada", "state": "Karnataka", "km_from_prev": 6.8, "travel_min": 10, "archana_min": 90, "arrive": "09:44", "depart": "11:14", "lat": 12.8702, "lon": 74.8388, "id": "V10"}, {"day": 4, "stop": 18, "type": "Shiva", "name": "Kadri Manjunath Temple", "district": "Dakshina Kannada", "state": "Karnataka", "km_from_prev": 1.5, "travel_min": 2, "archana_min": 90, "arrive": "11:16", "depart": "12:46", "lat": 12.8825, "lon": 74.8554, "id": "S42"}, {"day": 4, "stop": 19, "type": "Shiva", "name": "Dharmasthala Manjunatheshwara Temple", "district": "Dakshina Kannada", "state": "Karnataka", "km_from_prev": 74.5, "travel_min": 112, "archana_min": 90, "arrive": "14:38", "depart": "16:08", "lat": 12.9504, "lon": 75.3807, "id": "S29"}, {"day": 5, "stop": 20, "type": "Vishnu", "name": "Chennakeshava Temple, Belur", "district": "Hassan", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 13.1659, "lon": 75.8634, "id": "V6"}, {"day": 5, "stop": 21, "type": "Vishnu", "name": "Chennakeshava Temple, Halebidu", "district": "Hassan", "state": "Karnataka", "km_from_prev": 19.5, "travel_min": 29, "archana_min": 90, "arrive": "06:59", "depart": "08:29", "lat": 13.2141, "lon": 75.993, "id": "V8"}, {"day": 5, "stop": 22, "type": "Shiva", "name": "Hoysaleshwara Temple (Halebidu)", "district": "Hassan", "state": "Karnataka", "km_from_prev": 0.4, "travel_min": 1, "archana_min": 90, "arrive": "08:30", "depart": "10:00", "lat": 13.2154, "lon": 75.9959, "id": "S34"}, {"day": 5, "stop": 23, "type": "Vishnu", "name": "Sri Lakshminarayana Temple, Doddagaddavalli", "district": "Hassan", "state": "Karnataka", "km_from_prev": 5.0, "travel_min": 8, "archana_min": 90, "arrive": "10:08", "depart": "11:38", "lat": 13.25, "lon": 76.0, "id": "V18"}, {"day": 5, "stop": 24, "type": "Vishnu", "name": "Lakshminarasimha Temple, Nuggehalli", "district": "Hassan", "state": "Karnataka", "km_from_prev": 40.7, "travel_min": 61, "archana_min": 90, "arrive": "12:39", "depart": "14:09", "lat": 13.18, "lon": 76.28, "id": "V9"}, {"day": 5, "stop": 25, "type": "Vishnu", "name": "Sri Channakeshava Temple, Aralaguppe", "district": "Tumkur", "state": "Karnataka", "km_from_prev": 71.6, "travel_min": 107, "archana_min": 90, "arrive": "15:56", "depart": "17:26", "lat": 13.58, "lon": 76.58, "id": "V14"}, {"day": 6, "stop": 26, "type": "Shiva", "name": "Shivagange (Shivaganga)", "district": "Bengaluru Rural", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 13.1965, "lon": 77.363, "id": "S47"}, {"day": 6, "stop": 27, "type": "Shiva", "name": "Ramalingeshwara Temple (Avani)", "district": "Kolar", "state": "Karnataka", "km_from_prev": 93.2, "travel_min": 140, "archana_min": 90, "arrive": "08:50", "depart": "10:20", "lat": 13.28, "lon": 78.02, "id": "S50"}, {"day": 6, "stop": 28, "type": "Shiva", "name": "Kotilingeshwara Temple", "district": "Kolar", "state": "Karnataka", "km_from_prev": 24.8, "travel_min": 37, "archana_min": 90, "arrive": "10:57", "depart": "12:27", "lat": 12.9947, "lon": 78.2953, "id": "S43"}, {"day": 6, "stop": 29, "type": "Shiva", "name": "Halasuru Someshwara Temple", "district": "Bengaluru", "state": "Karnataka", "km_from_prev": 76.6, "travel_min": 115, "archana_min": 90, "arrive": "14:22", "depart": "15:52", "lat": 12.9756, "lon": 77.6239, "id": "S38", "contact_person": "Someshwar Dixit", "contact_phone": "82177 28736"}, {"day": 6, "stop": 30, "type": "Shiva", "name": "Kadu Malleshwara Temple", "district": "Bengaluru", "state": "Karnataka", "km_from_prev": 8.8, "travel_min": 13, "archana_min": 90, "arrive": "16:05", "depart": "17:35", "lat": 13.005, "lon": 77.5714, "id": "S37"}, {"day": 7, "stop": 31, "type": "Shiva", "name": "Gavi Gangadhareshwara Temple", "district": "Bengaluru", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 12.9482, "lon": 77.563, "id": "S36", "contact_person": "Srikanda Dixit", "contact_phone": "98450 65732"}, {"day": 7, "stop": 32, "type": "Shiva", "name": "Bull Temple (Dodda Basavana Gudi)", "district": "Bengaluru", "state": "Karnataka", "km_from_prev": 1.2, "travel_min": 2, "archana_min": 90, "arrive": "06:32", "depart": "08:02", "lat": 12.9418, "lon": 77.5687, "id": "S35"}, {"day": 7, "stop": 33, "type": "Shiva", "name": "Begur Nageshwara Temple", "district": "Bengaluru", "state": "Karnataka", "km_from_prev": 11.9, "travel_min": 18, "archana_min": 90, "arrive": "08:20", "depart": "09:50", "lat": 12.8759, "lon": 77.621, "id": "S49", "contact_person": "Bharath Dixit", "contact_phone": "99723 94381"}, {"day": 7, "stop": 34, "type": "Vishnu", "name": "Sri Aprameya Swamy Temple, Channapattana", "district": "Ramanagara", "state": "Karnataka", "km_from_prev": 66.7, "travel_min": 100, "archana_min": 90, "arrive": "11:30", "depart": "13:00", "lat": 12.6522, "lon": 77.2073, "id": "V15"}, {"day": 7, "stop": 35, "type": "Vishnu", "name": "Sri Lakshminarayana Temple, Hosaholalu", "district": "Mandya", "state": "Karnataka", "km_from_prev": 53.7, "travel_min": 80, "archana_min": 90, "arrive": "14:20", "depart": "15:50", "lat": 12.6424, "lon": 76.4787, "id": "V13"}, {"day": 7, "stop": 36, "type": "Vishnu", "name": "Sri Yoga Narasimha Swamy Temple, Melkote", "district": "Mandya", "state": "Karnataka", "km_from_prev": 33.9, "travel_min": 51, "archana_min": 90, "arrive": "16:41", "depart": "18:11", "lat": 12.66, "lon": 76.6433, "id": "V3"}, {"day": 8, "stop": 37, "type": "Vishnu", "name": "Cheluvanarayana Swamy Temple, Melkote", "district": "Mandya", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 12.7008, "lon": 76.6626, "id": "V2"}, {"day": 8, "stop": 38, "type": "Vishnu", "name": "Sri Ranganathaswamy Temple, Srirangapatna", "district": "Mandya", "state": "Karnataka", "km_from_prev": 34.2, "travel_min": 51, "archana_min": 90, "arrive": "07:21", "depart": "08:51", "lat": 12.428, "lon": 76.6944, "id": "V4"}, {"day": 8, "stop": 39, "type": "Vishnu", "name": "Sri Narayanaswamy Temple, Mysuru", "district": "Mysuru", "state": "Karnataka", "km_from_prev": 20.6, "travel_min": 31, "archana_min": 90, "arrive": "09:22", "depart": "10:52", "lat": 12.2715, "lon": 76.6699, "id": "V16"}, {"day": 8, "stop": 40, "type": "Shiva", "name": "Nanjundeshwara Temple (Nanjangud)", "district": "Mysuru", "state": "Karnataka", "km_from_prev": 26.7, "travel_min": 40, "archana_min": 90, "arrive": "11:32", "depart": "13:02", "lat": 12.1162, "lon": 76.6833, "id": "S31"}, {"day": 8, "stop": 41, "type": "Vishnu", "name": "Sri Venugopala Krishna Temple, T. Narasipura", "district": "Mysuru", "state": "Karnataka", "km_from_prev": 33.7, "travel_min": 51, "archana_min": 90, "arrive": "13:53", "depart": "15:23", "lat": 12.2131, "lon": 76.9002, "id": "V12"}, {"day": 8, "stop": 42, "type": "Vishnu", "name": "Keshava Temple, Somanathapura", "district": "Mysuru", "state": "Karnataka", "km_from_prev": 6.6, "travel_min": 10, "archana_min": 90, "arrive": "15:33", "depart": "17:03", "lat": 12.2758, "lon": 76.8816, "id": "V7"}, {"day": 9, "stop": 43, "type": "Shiva", "name": "Talakadu Vaidyanatheshwara Temple", "district": "Mysuru", "state": "Karnataka", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 12.202, "lon": 77.0402, "id": "S33", "contact_person": "Anand Dixit", "contact_phone": "97405 02423"}, {"day": 9, "stop": 44, "type": "Vishnu", "name": "Sri Ranganathaswamy Temple, Shivanasamudra", "district": "Mandya", "state": "Karnataka", "km_from_prev": 19.5, "travel_min": 29, "archana_min": 90, "arrive": "06:59", "depart": "08:29", "lat": 12.2671, "lon": 77.1614, "id": "V17"}, {"day": 9, "stop": 45, "type": "Shiva", "name": "Male Mahadeshwara Temple", "district": "Chamarajanagar", "state": "Karnataka", "km_from_prev": 70.2, "travel_min": 105, "archana_min": 90, "arrive": "10:14", "depart": "11:44", "lat": 11.8067, "lon": 77.0028, "id": "S30"}], "Andhra Pradesh": [{"day": 1, "stop": 1, "type": "Shiva", "name": "Srikalahasteeswara Temple", "district": "Tirupati", "state": "Andhra Pradesh", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 150, "arrive": "05:00", "depart": "07:30", "lat": 13.7513, "lon": 79.6992, "id": "S51", "contact_person": "Prabu Deva Sivam", "contact_phone": "95151 54805"}, {"day": 1, "stop": 2, "type": "Vishnu", "name": "Sri Vedanarayana Swamy Temple, Nagalapuram", "district": "Tirupati", "state": "Andhra Pradesh", "km_from_prev": 29.1, "travel_min": 44, "archana_min": 90, "arrive": "08:14", "depart": "09:44", "lat": 13.3875, "lon": 79.7934, "id": "V58"}, {"day": 1, "stop": 3, "type": "Vishnu", "name": "Sri Kodandarama Temple, Tirupati", "district": "Tirupati", "state": "Andhra Pradesh", "km_from_prev": 16.3, "travel_min": 24, "archana_min": 90, "arrive": "10:08", "depart": "11:38", "lat": 13.635, "lon": 79.425, "id": "V59"}, {"day": 1, "stop": 4, "type": "Vishnu", "name": "Sri Govindaraja Swamy Temple, Tirupati", "district": "Tirupati", "state": "Andhra Pradesh", "km_from_prev": 1.2, "travel_min": 2, "archana_min": 90, "arrive": "11:40", "depart": "13:10", "lat": 13.6288, "lon": 79.4192, "id": "V52", "contact_person": "Vimal Sivam", "contact_phone": "91764 15287"}, {"day": 1, "stop": 5, "type": "Vishnu", "name": "Sri Venkateswara Temple, Tirumala", "district": "Tirupati", "state": "Andhra Pradesh", "km_from_prev": 12.8, "travel_min": 19, "archana_min": 150, "arrive": "13:29", "depart": "15:59", "lat": 13.6832, "lon": 79.3473, "id": "V46", "contact_person": "Vimal Sivam", "contact_phone": "91764 15287"}, {"day": 2, "stop": 6, "type": "Shiva", "name": "Veera Bhadra Swamy Temple (Lepakshi)", "district": "Anantapur", "state": "Andhra Pradesh", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 13.8074, "lon": 77.6075, "id": "S57"}, {"day": 2, "stop": 7, "type": "Vishnu", "name": "Sri Ranganathaswamy Temple, Tadpatri", "district": "Anantapur", "state": "Andhra Pradesh", "km_from_prev": 168.6, "travel_min": 253, "archana_min": 90, "arrive": "10:43", "depart": "12:13", "lat": 14.9067, "lon": 78.01, "id": "V57"}, {"day": 2, "stop": 8, "type": "Shiva", "name": "Yaganti Uma Maheshwara Temple", "district": "Nandyal", "state": "Andhra Pradesh", "km_from_prev": 87.7, "travel_min": 132, "archana_min": 90, "arrive": "14:25", "depart": "15:55", "lat": 15.3506, "lon": 78.1387, "id": "S58"}, {"day": 2, "stop": 9, "type": "Shiva", "name": "Mahanandi Temple", "district": "Nandyal", "state": "Andhra Pradesh", "km_from_prev": 7.9, "travel_min": 12, "archana_min": 90, "arrive": "16:07", "depart": "17:37", "lat": 15.374, "lon": 78.494, "id": "S56"}, {"day": 3, "stop": 10, "type": "Shiva", "name": "Sangameswaram Temple", "district": "Kurnool", "state": "Andhra Pradesh", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 16.087, "lon": 78.868, "id": "S60"}, {"day": 3, "stop": 11, "type": "Vishnu", "name": "Ahobilam Nava Narasimha Temples", "district": "Nandyal", "state": "Andhra Pradesh", "km_from_prev": 104.5, "travel_min": 157, "archana_min": 90, "arrive": "09:07", "depart": "10:37", "lat": 15.1338, "lon": 78.6749, "id": "V49"}, {"day": 3, "stop": 12, "type": "Vishnu", "name": "Vontimitta Kodandarama Temple", "district": "YSR Kadapa", "state": "Andhra Pradesh", "km_from_prev": 118.9, "travel_min": 178, "archana_min": 90, "arrive": "13:35", "depart": "15:05", "lat": 14.3938, "lon": 79.0265, "id": "V53"}, {"day": 3, "stop": 13, "type": "Vishnu", "name": "Penchalakona Lakshmi Narasimha Temple", "district": "Nellore", "state": "Andhra Pradesh", "km_from_prev": 74.0, "travel_min": 111, "archana_min": 90, "arrive": "16:56", "depart": "18:26", "lat": 14.3365, "lon": 79.4104, "id": "V54"}, {"day": 4, "stop": 14, "type": "Vishnu", "name": "Sri Bhavanarayana Swamy Temple, Bapatla", "district": "Bapatla", "state": "Andhra Pradesh", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 15.905, "lon": 80.467, "id": "V60"}, {"day": 4, "stop": 15, "type": "Shiva", "name": "Kotappakonda Trikoteswara Temple", "district": "Guntur", "state": "Andhra Pradesh", "km_from_prev": 60.2, "travel_min": 90, "archana_min": 90, "arrive": "08:00", "depart": "09:30", "lat": 16.147, "lon": 80.0354, "id": "S59"}, {"day": 4, "stop": 16, "type": "Shiva", "name": "Amararama Amareswara Temple (Amaravathi)", "district": "Guntur", "state": "Andhra Pradesh", "km_from_prev": 39.7, "travel_min": 60, "archana_min": 90, "arrive": "10:30", "depart": "12:00", "lat": 16.5228, "lon": 80.5243, "id": "S53"}, {"day": 4, "stop": 17, "type": "Vishnu", "name": "Mangalagiri Panakala Narasimha Swamy Temple", "district": "Guntur", "state": "Andhra Pradesh", "km_from_prev": 33.9, "travel_min": 51, "archana_min": 90, "arrive": "12:51", "depart": "14:21", "lat": 16.4368, "lon": 80.5708, "id": "V50"}, {"day": 4, "stop": 18, "type": "Vishnu", "name": "Sri Venkateswara Swamy Temple, Dwaraka Tirumala", "district": "West Godavari", "state": "Andhra Pradesh", "km_from_prev": 107.4, "travel_min": 161, "archana_min": 90, "arrive": "17:02", "depart": "18:32", "lat": 16.9545, "lon": 81.2566, "id": "V56"}, {"day": 5, "stop": 19, "type": "Shiva", "name": "Ksheerarama Someswara Temple (Palakollu)", "district": "West Godavari", "state": "Andhra Pradesh", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 16.5155, "lon": 81.7343, "id": "S55"}, {"day": 5, "stop": 20, "type": "Vishnu", "name": "Sri Lakshmi Narasimha Swamy Temple, Antarvedi", "district": "East Godavari", "state": "Andhra Pradesh", "km_from_prev": 65.2, "travel_min": 98, "archana_min": 90, "arrive": "08:08", "depart": "09:38", "lat": 16.58, "lon": 82.2, "id": "V55"}, {"day": 5, "stop": 21, "type": "Shiva", "name": "Draksharamam Bhimeswara Temple", "district": "East Godavari", "state": "Andhra Pradesh", "km_from_prev": 36.5, "travel_min": 55, "archana_min": 90, "arrive": "10:33", "depart": "12:03", "lat": 16.7955, "lon": 82.063, "id": "S52"}, {"day": 5, "stop": 22, "type": "Shiva", "name": "Kumararama Bhimeswara Temple", "district": "East Godavari", "state": "Andhra Pradesh", "km_from_prev": 70.1, "travel_min": 105, "archana_min": 90, "arrive": "13:48", "depart": "15:18", "lat": 17.2537, "lon": 81.8963, "id": "S54"}, {"day": 5, "stop": 23, "type": "Vishnu", "name": "Sri Veera Venkata Satyanarayana Swamy Temple, Annavaram", "district": "Kakinada", "state": "Andhra Pradesh", "km_from_prev": 24.4, "travel_min": 37, "archana_min": 90, "arrive": "15:55", "depart": "17:25", "lat": 17.2842, "lon": 82.4171, "id": "V48"}, {"day": 6, "stop": 24, "type": "Vishnu", "name": "Simhachalam Varaha Lakshmi Narasimha Temple", "district": "Visakhapatnam", "state": "Andhra Pradesh", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 17.7663, "lon": 83.2505, "id": "V47"}, {"day": 6, "stop": 25, "type": "Vishnu", "name": "Srikurmam Kurmanathaswamy Temple", "district": "Srikakulam", "state": "Andhra Pradesh", "km_from_prev": 119.4, "travel_min": 179, "archana_min": 90, "arrive": "09:29", "depart": "10:59", "lat": 18.271, "lon": 84.0048, "id": "V51"}], "Telangana": [{"day": 1, "stop": 1, "type": "Shiva", "name": "Vemulawada Rajanna Temple", "district": "Rajanna Sircilla", "state": "Telangana", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 18.4648, "lon": 78.8618, "id": "S61"}, {"day": 1, "stop": 2, "type": "Shiva", "name": "Kotilingala Someswara Temple", "district": "Jagtiyal", "state": "Telangana", "km_from_prev": 17.3, "travel_min": 26, "archana_min": 90, "arrive": "06:56", "depart": "08:26", "lat": 18.55, "lon": 78.95, "id": "S67"}, {"day": 1, "stop": 3, "type": "Vishnu", "name": "Sri Laxmi Narasimha Swamy Temple, Dharmapuri", "district": "Jagtial", "state": "Telangana", "km_from_prev": 5.1, "travel_min": 8, "archana_min": 90, "arrive": "08:34", "depart": "10:04", "lat": 18.52, "lon": 78.97, "id": "V65"}, {"day": 1, "stop": 4, "type": "Shiva", "name": "Kaleshwaram Mukteshwara Swamy Temple", "district": "Jayashankar Bhupalpally", "state": "Telangana", "km_from_prev": 134.4, "travel_min": 202, "archana_min": 90, "arrive": "13:26", "depart": "14:56", "lat": 18.8118, "lon": 79.9053, "id": "S63"}, {"day": 2, "stop": 5, "type": "Shiva", "name": "Ramappa Temple (UNESCO)", "district": "Mulugu", "state": "Telangana", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 150, "arrive": "05:00", "depart": "07:30", "lat": 18.2593, "lon": 79.9432, "id": "S62"}, {"day": 2, "stop": 6, "type": "Vishnu", "name": "Sri Sita Ramachandra Swamy Temple, Bhadrachalam", "district": "Bhadradri Kothagudem", "state": "Telangana", "km_from_prev": 153.7, "travel_min": 231, "archana_min": 150, "arrive": "11:21", "depart": "13:51", "lat": 17.6669, "lon": 80.8825, "id": "V62"}, {"day": 3, "stop": 7, "type": "Shiva", "name": "Thousand Pillar Temple (Hanamkonda)", "district": "Hanamkonda", "state": "Telangana", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 17.98, "lon": 79.56, "id": "S64"}, {"day": 3, "stop": 8, "type": "Vishnu", "name": "Sri Lakshmi Narasimha Swamy Temple, Yadadri", "district": "Yadadri Bhuvanagiri", "state": "Telangana", "km_from_prev": 98.8, "travel_min": 148, "archana_min": 90, "arrive": "08:58", "depart": "10:28", "lat": 17.572, "lon": 78.984, "id": "V61"}, {"day": 3, "stop": 9, "type": "Vishnu", "name": "Sri Kolanupaka Veeranarayana Temple", "district": "Yadadri Bhuvanagiri", "state": "Telangana", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "10:28", "depart": "11:58", "lat": 17.572, "lon": 78.984, "id": "V66"}, {"day": 3, "stop": 10, "type": "Shiva", "name": "Keesaragutta Ramalingeswara Temple", "district": "Medchal-Malkajgiri", "state": "Telangana", "km_from_prev": 35.0, "travel_min": 53, "archana_min": 90, "arrive": "12:51", "depart": "14:21", "lat": 17.5297, "lon": 78.6892, "id": "S65"}, {"day": 3, "stop": 11, "type": "Vishnu", "name": "Sri Sita Ramachandra Swamy Temple, Ammapalle", "district": "Medchal-Malkajgiri", "state": "Telangana", "km_from_prev": 30.1, "travel_min": 45, "archana_min": 90, "arrive": "15:06", "depart": "16:36", "lat": 17.42, "lon": 78.59, "id": "V67"}, {"day": 3, "stop": 12, "type": "Vishnu", "name": "Birla Mandir, Hyderabad", "district": "Hyderabad", "state": "Telangana", "km_from_prev": 16.8, "travel_min": 25, "archana_min": 90, "arrive": "17:01", "depart": "18:31", "lat": 17.4057, "lon": 78.4693, "id": "V64"}, {"day": 4, "stop": 13, "type": "Vishnu", "name": "Chilkur Balaji Temple (Visa Balaji)", "district": "Rangareddy", "state": "Telangana", "km_from_prev": 0.0, "travel_min": 0, "archana_min": 90, "arrive": "05:00", "depart": "06:30", "lat": 17.3588, "lon": 78.2988, "id": "V63"}, {"day": 4, "stop": 14, "type": "Shiva", "name": "Alampur Navabrahma Temples", "district": "Jogulamba Gadwal", "state": "Telangana", "km_from_prev": 215.0, "travel_min": 323, "archana_min": 90, "arrive": "11:53", "depart": "13:23", "lat": 15.8763, "lon": 78.1303, "id": "S66"}]};
+const STATS = {"Tamil Nadu":{"days":10,"temples":56,"km":1511,"first":"Arunachaleswarar Temple","last":"Ramanathaswamy Temple (Devipattinam)","abbr":"TN"},"Karnataka":{"days":9,"temples":45,"km":1587,"first":"Virupaksha Temple (Hampi)","last":"Male Mahadeshwara Temple","abbr":"KA"},"Andhra Pradesh":{"days":6,"temples":25,"km":1178,"first":"Srikalahasteeswara Temple","last":"Srikurmam Kurmanathaswamy Temple","abbr":"AP"},"Telangana":{"days":4,"temples":14,"km":706,"first":"Vemulawada Rajanna Temple","last":"Alampur Navabrahma Temples","abbr":"TG"}};
+const DAY_PALETTE = ["#4A90D9", "#E67E22", "#27AE60", "#8E44AD", "#E74C3C", "#16A085", "#F39C12", "#2980B9", "#D35400", "#1ABC9C", "#C0392B", "#2ECC71", "#9B59B6", "#F1C40F", "#3498DB"];
+
+function dayColor(d) {
+  return DAY_PALETTE[(d - 1) % DAY_PALETTE.length];
+}
+
+function fmtDrive(min) {
+  if (min === 0) return '-';
+  const h = Math.floor(min/60), m = min%60;
+  return h > 0 ? `${h}h${m > 0 ? m+'m' : ''}` : `${m}m`;
+}
+
+// Map state
+let map = null;
+let markers = [];
+let polylines = [];
+let activeState = 'Tamil Nadu';
+let selectedRow = null;
+let selectedMarkerIdx = null;
+let markerObjects = [];
+
+function initMap() {
+  map = L.map('map', {
+    zoomControl: true,
+    attributionControl: true,
+    tap: true
+  });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(map);
+  document.getElementById('loading').style.display = 'none';
+}
+
+function clearMap() {
+  markers.forEach(m => map.removeLayer(m));
+  polylines.forEach(p => map.removeLayer(p));
+  markers = [];
+  polylines = [];
+  markerObjects = [];
+}
+
+function makeMarkerIcon(stopNum, dayNum, type) {
+  const col = dayColor(dayNum);
+  const border = type === 'Shiva' ? '#E65100' : '#1565C0';
+  const bg = type === 'Shiva' ? '#FF8C00' : '#1976D2';
+  const emoji = type === 'Shiva' ? '🕉' : '🙏';
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:34px;height:34px;border-radius:50%;
+      background:${bg};border:3px solid ${col};
+      display:flex;align-items:center;justify-content:center;
+      font-size:0.7rem;font-weight:700;color:white;
+      box-shadow:0 2px 6px rgba(0,0,0,0.35);
+      position:relative;cursor:pointer;
+    ">
+      <span style="font-size:0.95rem;line-height:1">${emoji}</span>
+      <span style="
+        position:absolute;top:-6px;right:-6px;
+        background:${col};color:white;
+        width:16px;height:16px;border-radius:50%;
+        font-size:0.6rem;font-weight:800;
+        display:flex;align-items:center;justify-content:center;
+        border:1px solid white;
+      ">${stopNum}</span>
+    </div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -20]
+  });
+}
+
+function buildPopup(temple, idx) {
+  const stops = SCHEDULES[activeState];
+  const prevTemple = idx > 0 ? stops[idx-1] : null;
+  const dirUrl = prevTemple
+    ? `https://www.google.com/maps/dir/${prevTemple.lat},${prevTemple.lon}/${temple.lat},${temple.lon}`
+    : `https://www.google.com/maps?q=${temple.lat},${temple.lon}`;
+  const mapsUrl = `https://www.google.com/maps?q=${temple.lat},${temple.lon}`;
+  const archH = temple.archana_min >= 150 ? '2.5h' : '1.5h';
+  return `<div class="popup-content">
+    <div class="popup-title">${temple.name}</div>
+    <div class="popup-sub">📍 ${temple.district} · ${temple.state}</div>
+    <div class="popup-sub">Day ${temple.day} · Stop #${temple.stop} · ${temple.type} temple</div>
+    <div class="popup-time">⏰ ${temple.arrive} – ${temple.depart} (${archH} archana)</div>
+    ${temple.km_from_prev > 0 ? `<div class="popup-time">🚗 ${temple.km_from_prev} km · ${fmtDrive(temple.travel_min)} drive</div>` : ''}
+    ${temple.contact_person ? `<div class="popup-time">👤 <strong>${temple.contact_person}</strong> · <a href="tel:${temple.contact_phone.replace(/ /g,'')}" style="color:#1a73e8;text-decoration:none;">📞 ${temple.contact_phone}</a></div>` : ''}
+    <div class="popup-btns">
+      <a href="${mapsUrl}" target="_blank" class="popup-btn popup-btn-maps">📍 Open in Google Maps</a>
+      <a href="${dirUrl}" target="_blank" class="popup-btn popup-btn-dir">🗺️ Get Directions</a>
+    </div>
+  </div>`;
+}
+
+
+let currentKartaSlug = null;
+let currentKartaTemples = null;
+const KARTAS_BY_STATE = {};
+
+const _STATE_TO_CODE = {'Tamil Nadu':'tn','Karnataka':'ka','Andhra Pradesh':'ap','Telangana':'tg'};
+
+async function loadKartasForState(state) {
+  const code = _STATE_TO_CODE[state];
+  const sel = document.getElementById('karta-select');
+  sel.innerHTML = '<option value="">— All temples (no filter) —</option>';
+  document.getElementById('karta-link').style.display = 'none';
+  currentKartaSlug = null;
+  currentKartaTemples = null;
+  if (!code) return;
+  try {
+    if (!KARTAS_BY_STATE[code]) {
+      const r = await fetch('/k/api/state/' + code);
+      const j = await r.json();
+      KARTAS_BY_STATE[code] = j.kartas || [];
+    }
+  } catch(e) { KARTAS_BY_STATE[code] = []; }
+  const stateTempleNames = new Set((SCHEDULES[state] || []).map(t => t.name));
+  KARTAS_BY_STATE[code].forEach(k => {
+    const allNames = k.temples.map(t => t.name);
+    const matching = allNames.filter(n => stateTempleNames.has(n));
+    const opt = document.createElement('option');
+    opt.value = k.slug;
+    // Filter the dropdown's stored names to only those visible on map (so filter matches count)
+    opt.dataset.temples = JSON.stringify(matching);
+    opt.dataset.name = k.name;
+    const label = matching.length === allNames.length
+      ? (k.name + ' (' + matching.length + ' temples)')
+      : (k.name + ' (' + matching.length + ' on map · ' + allNames.length + ' total)');
+    opt.textContent = label;
+    sel.appendChild(opt);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.getElementById('karta-select');
+  if (sel) {
+    sel.addEventListener('change', (e) => {
+      const o = e.target;
+      const link = document.getElementById('karta-link');
+      if (!o.value) {
+        currentKartaSlug = null;
+        currentKartaTemples = null;
+        link.style.display = 'none';
+      } else {
+        const opt = o.options[o.selectedIndex];
+        const names = JSON.parse(opt.dataset.temples || '[]');
+        currentKartaSlug = o.value;
+        currentKartaTemples = new Set(names);
+        link.href = '/k/' + o.value;
+        link.textContent = '📋 ' + opt.dataset.name + ' tracking →';
+        link.style.display = 'inline-block';
+      }
+      if (typeof loadState === 'function') loadState(activeState);
+    });
+  }
+});
+
+function _filterStops(state) {
+  let stops = SCHEDULES[state] || [];
+  if (currentKartaTemples && currentKartaTemples.size > 0) {
+    stops = stops.filter(t => currentKartaTemples.has(t.name));
+  }
+  return stops;
+}
+
+function loadState(state) {
+  activeState = state;
+  clearMap();
+  selectedRow = null;
+  selectedMarkerIdx = null;
+
+  const stops = _filterStops(state);
+  if (!stops || stops.length === 0) return;
+
+  // Group by day for polylines
+  const byDay = {};
+  stops.forEach(s => {
+    if (!byDay[s.day]) byDay[s.day] = [];
+    byDay[s.day].push(s);
+  });
+
+  // Draw polylines
+  Object.entries(byDay).forEach(([day, dayStops]) => {
+    const col = dayColor(parseInt(day));
+    const coords = dayStops.map(s => [s.lat, s.lon]);
+    if (coords.length > 1) {
+      const pl = L.polyline(coords, {
+        color: col, weight: 3, opacity: 0.75,
+        dashArray: '6,4'
+      }).addTo(map);
+      polylines.push(pl);
+    }
+  });
+
+  // Draw markers
+  stops.forEach((t, idx) => {
+    const icon = makeMarkerIcon(t.stop, t.day, t.type);
+    const marker = L.marker([t.lat, t.lon], {icon}).addTo(map);
+    marker.bindPopup(buildPopup(t, idx), {maxWidth: 280, minWidth: 240});
+    marker.on('click', () => {
+      selectStop(idx);
+    });
+    markers.push(marker);
+    markerObjects.push(marker);
+  });
+
+  // Fit map bounds
+  const lats = stops.map(s => s.lat);
+  const lons = stops.map(s => s.lon);
+  const bounds = [[Math.min(...lats)-0.2, Math.min(...lons)-0.2],
+                  [Math.max(...lats)+0.2, Math.max(...lons)+0.2]];
+  map.fitBounds(bounds, {padding: [20, 20]});
+
+  buildTable(state);
+  buildDayFilter(state);
+  updateSummary(state);
+}
+
+function selectStop(idx) {
+  // Deselect previous
+  if (selectedRow !== null) {
+    const prevRow = document.querySelector(`#table-body tr[data-idx="${selectedRow}"]`);
+    if (prevRow) prevRow.classList.remove('highlighted');
+  }
+
+  selectedMarkerIdx = idx;
+  selectedRow = idx;
+
+  // Highlight row
+  const row = document.querySelector(`#table-body tr[data-idx="${idx}"]`);
+  if (row) {
+    row.classList.add('highlighted');
+    row.scrollIntoView({behavior: 'smooth', block: 'center'});
+  }
+}
+
+function flyToStop(idx) {
+  const stops = SCHEDULES[activeState];
+  const t = stops[idx];
+  map.flyTo([t.lat, t.lon], 14, {duration: 0.8});
+  // Open popup
+  setTimeout(() => {
+    if (markerObjects[idx]) {
+      markerObjects[idx].openPopup();
+    }
+  }, 900);
+  selectStop(idx);
+}
+
+function buildDayFilter(state) {
+  const stops = _filterStops(state);
+  const days = [...new Set(stops.map(s => s.day))].sort((a,b) => a-b);
+  const container = document.getElementById('day-filter');
+  container.innerHTML = '<span style="font-size:0.75rem;color:#888;white-space:nowrap;padding:5px 4px;flex-shrink:0;">Jump:</span>';
+  days.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'day-pill';
+    btn.textContent = `Day ${d}`;
+    btn.style.background = dayColor(d);
+    btn.style.color = 'white';
+    btn.dataset.day = d;
+    btn.onclick = () => jumpToDay(d);
+    container.appendChild(btn);
+  });
+}
+
+function jumpToDay(dayNum) {
+  const row = document.querySelector(`#table-body tr.day-header[data-day="${dayNum}"]`);
+  if (row) {
+    row.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+  // Highlight all pills
+  document.querySelectorAll('.day-pill').forEach(p => {
+    p.classList.toggle('active', parseInt(p.dataset.day) === dayNum);
+  });
+}
+
+function buildTable(state) {
+  const stops = _filterStops(state);
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+
+  // Group by day
+  const byDay = {};
+  stops.forEach((s, idx) => {
+    if (!byDay[s.day]) byDay[s.day] = [];
+    byDay[s.day].push({...s, idx});
+  });
+
+  Object.entries(byDay).forEach(([dayNum, dayStops]) => {
+    const d = parseInt(dayNum);
+    const col = dayColor(d);
+    const dayKm = dayStops.reduce((sum, s) => sum + s.km_from_prev, 0);
+
+    // Day header row
+    const hdr = document.createElement('tr');
+    hdr.className = 'day-header';
+    hdr.dataset.day = d;
+    hdr.innerHTML = `<td colspan="7" style="border-left-color:${col}">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${col};vertical-align:middle;margin-right:6px;"></span>
+      Day ${d} &nbsp;·&nbsp; <strong>${dayStops.length} Temples</strong> &nbsp;·&nbsp; ${dayKm.toFixed(0)} km total
+    </td>`;
+    tbody.appendChild(hdr);
+
+    dayStops.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.className = `temple-row ${t.type === 'Shiva' ? 'shiva-row' : 'vishnu-row'}`;
+      tr.dataset.idx = t.idx;
+      tr.style.borderLeft = `3px solid ${col}`;
+
+      const icon = t.type === 'Shiva' ? '🕉' : '🙏';
+      const mapsUrl = `https://www.google.com/maps?q=${t.lat},${t.lon}`;
+      const archH = t.archana_min >= 150 ? '2.5h' : '1.5h';
+
+      tr.innerHTML = `
+        <td class="stop-num">${t.stop}</td>
+        <td class="type-icon">${icon}</td>
+        <td>
+          <div class="temple-name">${t.name}</div>
+          <div class="temple-district">📍 ${t.district}</div>
+          ${t.contact_person ? `<div class="temple-district" style="color:#555;margin-top:1px;">👤 ${t.contact_person} · <a href="tel:${t.contact_phone.replace(/ /g,'')}" style="color:#1a73e8;text-decoration:none;" onclick="event.stopPropagation()">📞 ${t.contact_phone}</a></div>` : ''}
+        </td>
+        <td class="km-cell">${t.km_from_prev > 0 ? t.km_from_prev + ' km' : '-'}</td>
+        <td class="time-cell">${fmtDrive(t.travel_min)}</td>
+        <td class="window-cell">${t.arrive}<br><small style="color:#888">→${t.depart}</small></td>
+        <td>
+          <a href="${mapsUrl}" target="_blank" class="gps-btn" onclick="event.stopPropagation()">📍</a>
+        </td>
+      `;
+
+      tr.addEventListener('click', () => flyToStop(t.idx));
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+function updateSummary(state) {
+  const s = STATS[state];
+  const bar = document.getElementById('summary-bar');
+  bar.innerHTML = `🗺️ <strong>${state}</strong> &nbsp;·&nbsp; ${s.temples} Temples &nbsp;·&nbsp; ${s.days} Days &nbsp;·&nbsp; ${s.km} km total &nbsp;·&nbsp; Start: <em>${s.first}</em> → End: <em>${s.last}</em>`;
+}
+
+// Scroll-to-top for table
+document.getElementById('table-wrap').addEventListener('scroll', function() {
+  document.getElementById('scroll-top').style.display = this.scrollTop > 200 ? 'flex' : 'none';
+});
+
+// URL routing: abbreviation <-> state name
+const ABBR_TO_STATE = {};
+const STATE_TO_ABBR = {};
+Object.entries(STATS).forEach(([name, info]) => {
+  const abbr = info.abbr.toLowerCase();
+  ABBR_TO_STATE[abbr] = name;
+  STATE_TO_ABBR[name] = abbr;
+});
+
+function switchState(state, pushUrl) {
+  document.querySelectorAll('.state-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.state === state);
+  });
+  loadKartasForState(state);
+  loadState(state);
+  if (pushUrl !== false) {
+    const abbr = STATE_TO_ABBR[state];
+    const newPath = abbr ? '/' + abbr : '/';
+    if (window.location.pathname !== newPath) {
+      history.pushState({state: state}, '', newPath);
+    }
+  }
+}
+
+// State tab switching
+document.querySelectorAll('.state-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    switchState(btn.dataset.state);
+  });
+});
+
+// Handle browser back/forward
+window.addEventListener('popstate', (e) => {
+  if (e.state && e.state.state) {
+    switchState(e.state.state, false);
+  } else {
+    // Fallback: check URL
+    const path = window.location.pathname.replace(/^\//, '').toLowerCase();
+    const state = ABBR_TO_STATE[path] || 'Tamil Nadu';
+    switchState(state, false);
+  }
+});
+
+// Init
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  const path = window.location.pathname.replace(/^\//, '').toLowerCase();
+  const initialState = ABBR_TO_STATE[path] || 'Tamil Nadu';
+  // Replace current history entry so back button works correctly
+  history.replaceState({state: initialState}, '', window.location.pathname);
+  switchState(initialState, false);
+});
+</script>
+</body>
+</html>

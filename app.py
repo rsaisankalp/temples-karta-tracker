@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """VDS Karta tracker - per-karta temple status + photo upload + WhatsApp share."""
-import json, os, urllib.request, urllib.parse, urllib.error, time, mimetypes
+import json, os, random, urllib.request, urllib.parse, urllib.error, time, mimetypes
 from flask import Flask, request, jsonify, Response
 
 app = Flask(__name__)
@@ -696,19 +696,106 @@ def build_karta_progress_message(slug):
             if status == 'Done': done.append(line)
             else: togo.append('• ' + name + ' — D' + str(day) + '/' + str(stop))
     total = len(done) + len(togo)
-    name_for_greeting = karta_name or slug
-    msg = '🙏🏼 Pranam ' + name_for_greeting + ',\n\n'
-    msg += 'Hope you are doing well. Sharing your Temple Yatra status:\n\n'
-    msg += '📊 Progress: ' + str(len(done)) + ' / ' + str(total) + ' temples · '
-    msg += str(pcoll) + ' / ' + str(total) + ' prasaad collected\n\n'
-    if togo:
-        msg += '⏳ Yet to visit:\n' + '\n'.join(togo[:30]) + '\n\n'
-    if done:
-        msg += '✅ Already completed:\n' + '\n'.join(done[:30]) + '\n\n'
-    msg += 'Kindly mark each temple as *Done* and prasaad as *Collected* on your tracker as you complete them. '
-    msg += 'Please also share your experience and photos when possible 🙌🏼\n\n'
-    msg += '🔗 Your tracker:\nhttps://temples.vaidicpujas.in/k/' + slug + '\n\n'
-    msg += 'With gratitude,\nVDS Team 🕉️'
+    name = karta_name or slug
+    progress_line = 'Progress: ' + str(len(done)) + ' / ' + str(total) + ' temples · ' + str(pcoll) + ' / ' + str(total) + ' prasaad collected'
+    todo_block = ('Yet to visit:
+' + '
+'.join(togo[:25])) if togo else ''
+    done_block = ('Already completed:
+' + '
+'.join(done[:25])) if done else ''
+    link = 'https://temples.vaidicpujas.in/k/' + slug
+
+    templates = [
+        ('🙏🏼 Pranam {name},
+
+Hope all is going well with the yatra. A small update on your temples:
+
+📊 {progress}
+
+{todo_block}
+
+{done_block}
+
+Whenever you get a moment, kindly mark the temples as *Done* and prasaad as *Collected* on your tracker — and do share a few photos / your experience if possible 🙌🏼
+
+🔗 {link}
+
+With gratitude 🕉️'),
+        ('Namaskaram {name} 🙏🏼
+
+A gentle followup on the temple yatra. Here is where things stand:
+
+📊 {progress}
+
+{todo_block}
+
+{done_block}
+
+Request you to please mark each temple as *Done* and the prasaad as *Collected* on the tracker as you complete them — also a few words or photos of the experience would be wonderful to share 📸🌸
+
+🔗 {link}
+
+Many thanks 🕉️'),
+        ('Pranam {name} ji 🌺
+
+Hope your yatra is going divinely. Sending across the latest status:
+
+📊 {progress}
+
+{todo_block}
+
+{done_block}
+
+Whenever convenient, do mark *Done* / *Collected* on your tracker — and please share any pictures or experiences that come along the way, would love to read them 🙏🏼
+
+🔗 {link}'),
+        ('Hari Om {name} 🌸
+
+Quick update on your assigned temples:
+
+📊 {progress}
+
+{todo_block}
+
+{done_block}
+
+Kindly tap *Done* and *Collected* on the tracker for the temples you have visited — and a short note or photo of the experience would mean a lot 📷🪷
+
+🔗 {link}
+
+Gratefully yours 🕉️'),
+        ('Namaste {name} 🙏🏼
+
+Hope this finds you in good health. Here is a snapshot of the yatra:
+
+📊 {progress}
+
+{todo_block}
+
+{done_block}
+
+At your convenience, please update the temples you have completed and prasaad collected on the tracker, and share whatever photos or thoughts you can — even a single line is a blessing to read 🌼
+
+🔗 {link}
+
+With deep regards 🕉️'),
+    ]
+    tmpl = random.choice(templates)
+    msg = tmpl.format(name=name, progress=progress_line, todo_block=todo_block, done_block=done_block, link=link)
+    # Clean up any double-blank-line gaps left by empty blocks
+    while '
+
+
+
+' in msg:
+        msg = msg.replace('
+
+
+
+', '
+
+')
     return karta_name, msg
 
 @app.route('/followup/api/wa-send', methods=['POST'])
